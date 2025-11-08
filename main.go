@@ -125,6 +125,16 @@ func main() {
 	}
 
 	table.Render()
+
+	// 如果不是 --all 并且结果不为空 → 进入 fzf
+	if !*allFlag && len(result) > 0 {
+		chosen, err := pickWithFzf(result)
+		if err == nil {
+			openFileAtLine(chosen.File, chosen.Line)
+			return
+		}
+	}
+
 }
 
 // scanMarkdownFiles recursively finds all .md files under root
