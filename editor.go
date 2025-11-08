@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 )
@@ -20,21 +21,36 @@ func defaultEditor() string {
 
 // 打开文件并跳到指定行
 func openFileAtLine(file string, line int) error {
+	editor := os.Getenv("VISUAL")
+	if editor == "" {
+		editor = os.Getenv("EDITOR")
+	}
+
+	// If an editor is explicitly set, we try to jump line
+	if editor != "" {
+		base := filepath.Base(editor)
+		switch base {
+		case "nvim", "vim":
+			return exec.Command(editor, fmt.Sprintf("+%d", line), file).Start()
+		case "hx":
+			return exec.Command(editor, fmt.Sprintf("%s:%d", file, line)).Start()
+		case "code":
+			return exec.Command("code", "-g", fmt.Sprintf("%s:%d", file, line)).Start()
+		case "subl":
+			return exec.Command("subl", fmt.Sprintf("%s:%d", file, line)).Start()
+		}
+		// Fallback: generic +line
+		return exec.Command(editor, fmt.Sprintf("+%d", line), file).Start()
+	}
+
+	// No editor set: use platform default
 	switch runtime.GOOS {
 	case "windows":
-		// Windows 默认跳行不保证支持，所以直接交给默认编辑器
+		// Windows 没法跳行，只能打开文件
 		return exec.Command("cmd", "/c", "start", "", file).Start()
-
 	case "darwin":
-		if ed := os.Getenv("EDITOR"); ed != "" {
-			return exec.Command(ed, fmt.Sprintf("+%d", line), file).Start()
-		}
 		return exec.Command("open", file).Start()
-
-	default: // Linux
-		if ed := os.Getenv("EDITOR"); ed != "" {
-			return exec.Command(ed, fmt.Sprintf("+%d", line), file).Start()
-		}
+	default:
 		return exec.Command("xdg-open", file).Start()
 	}
 }
